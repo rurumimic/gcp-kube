@@ -1,0 +1,103 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend-deploy
+  labels:
+    name: backend
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:alpine
+          ports:
+          - containerPort: 80
+          volumeMounts:
+            - name: default-conf-file
+              mountPath: /etc/nginx/templates/default.conf.template
+              subPath: default.conf.template
+              readOnly: true
+            - name: nginx-conf-file
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+        - name: app
+          image: asia.gcr.io/my-project/app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+          - containerPort: 3000
+          env:
+          - name: NODE_ENV
+            value: production
+          - name: DB_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: database-secret
+                key: username
+          - name: DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: database-secret
+                key: password
+          - name: DB_HOST
+            value: localhost:6033
+          - name: DB_NAME
+            value: default
+        - name: proxysql
+          image: proxysql/proxysql:latest
+          ports:
+          - containerPort: 6033
+            name: proxysql-mysql
+          - containerPort: 6032
+            name: proxysql-admin
+          volumeMounts:
+          - name: proxysql-conf-file
+            mountPath: /etc/proxysql.cnf
+            subPath: proxysql.cnf
+        - name: cloudsql-proxy
+          image: gcr.io/cloudsql-docker/gce-proxy:1.17
+          command:
+            - "/cloud_sql_proxy"
+            - "-ip_address_types=PRIVATE"
+            - "-instances=my-project:asia-northeast3:master=tcp:3316,my-project:asia-northeast3:slave-1=tcp:3326"
+            - "-credential_file=/secrets/cloudsql/key.json"
+          securityContext:
+            runAsNonRoot: true
+          volumeMounts:
+            - name: cloudsql-instance-credentials
+              mountPath: /secrets/cloudsql
+              readOnly: true
+      volumes:
+        - name: default-conf-file
+          configMap:
+            name: nginx-default-conf
+        - name: nginx-conf-file
+          configMap:
+            name: nginx-nginx-conf
+        - name: proxysql-conf-file
+          configMap:
+            name: proxysql-conf
+        - name: cloudsql-instance-credentials
+          secret:
+            secretName: cloudsql-instance-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend-service
+spec:
+  type: ClusterIP
+  selector:
+    app: backend
+  ports:
+    - protocol: TCP
+      name: http
+      port: 80
+      targetPort: 80

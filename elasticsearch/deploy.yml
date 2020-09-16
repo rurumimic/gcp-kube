@@ -1,0 +1,59 @@
+apiVersion: elasticsearch.k8s.elastic.co/v1
+kind: Elasticsearch
+metadata:
+  name: elastic
+spec:
+  version: 7.9.0
+  http:
+    tls:
+      selfSignedCertificate:
+        disabled: true
+  nodeSets:
+  - name: default
+    count: 3
+    config:
+      node.master: true
+      node.data: true
+      xpack.security.enabled: false
+    volumeClaimTemplates:
+    - metadata:
+        name: elastic-pv-claim
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 6Gi
+        storageClassName: ssd
+    podTemplate:
+      metadata:
+        annotations:
+          traffic.sidecar.istio.io/includeInboundPorts: "*"
+          traffic.sidecar.istio.io/excludeOutboundPorts: "9300,443" 
+          traffic.sidecar.istio.io/excludeInboundPorts: "9300"
+      spec:
+        automountServiceAccountToken: true
+        initContainers:
+        - name: sysctl
+          securityContext:
+            privileged: true
+          command: ['sh', '-c', 'sysctl -w vm.max_map_count=262144']
+        containers:
+        - name: elasticsearch
+          resources:
+            limits:
+              memory: 3072Mi
+              cpu: 1.3
+          env:
+          - name: ES_JAVA_OPTS
+            value: "-Xms1536m -Xmx1536m"
+---
+apiVersion: networking.istio.io/v1alpha3
+kind: DestinationRule
+metadata:
+  name: elastic
+spec:
+  host: elastic-es-http.default.svc.cluster.local
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

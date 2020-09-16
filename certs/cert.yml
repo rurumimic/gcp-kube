@@ -1,0 +1,11 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: my-cert
+  namespace: istio-system
+spec:
+  secretName: my-tls
+  issuerRef:
+    name: my-issuer
+  dnsNames:
+  - example.com

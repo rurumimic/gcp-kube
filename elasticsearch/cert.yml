@@ -1,0 +1,22 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: elastic-issuer
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1alpha2
+kind: Certificate
+metadata:
+  name: elastic-es-cert
+spec:
+  isCA: true
+  secretName: elastic-es-cert
+  commonName: elastic-es-http
+  issuerRef:
+    kind: Issuer
+    name: elastic-issuer
+  dnsNames:
+    - elastic-es-http
+    - elastic-es-http.default.svc
+    - elastic-es-http.default.svc.cluster.local

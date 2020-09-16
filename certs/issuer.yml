@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1alpha2
+kind: Issuer
+metadata:
+  name: my-issuer
+  namespace: istio-system
+spec:
+  acme:
+    email: my@example.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: my-issuer-account-key
+    solvers:
+    - dns01:
+        clouddns:
+          project: my-project
+          serviceAccountSecretRef:
+            name: clouddns-dns01-solver-svc-acct
+            key: key.json
